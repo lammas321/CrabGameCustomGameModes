@@ -30,6 +30,6 @@ Players that join you without the mod will...
 - and can see that they're in the red but still live (because I made the amount of players Standoff kills more forgiving and the amount of players that will die is calculated on every client)
 
 ## What are some other custom game modes I can get?
-- [Squenced Drop](https://github.com/lammas321/CrabGameSequencedDropGameMode)
-- [Unstable Rocks](https://github.com/lammas321/CrabGameUnstableRocksGameMode)
-- [Tantan Prime](https://github.com/lammas321/CrabGameTantanPrimeGameMode)
+- ### [Squenced Drop](https://github.com/lammas321/CrabGameSequencedDropGameMode)
+- ### [Unstable Rocks](https://github.com/lammas321/CrabGameUnstableRocksGameMode)
+- ### [Tantan Prime](https://github.com/lammas321/CrabGameTantanPrimeGameMode)
