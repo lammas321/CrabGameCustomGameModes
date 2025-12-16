@@ -1,4 +1,5 @@
 ﻿using BepInEx.IL2CPP.Utils;
+using CrabDevKit.Intermediary;
 using HarmonyLib;
 using SteamworksNative;
 using System;
@@ -11,7 +12,7 @@ namespace CustomGameModes
     public sealed class CustomGameModeStandoff : CustomGameMode
     {
         internal static CustomGameModeStandoff Instance;
-        internal static GameModeStandoff Standoff;
+        internal static Deobf_GameModeStandoff Standoff;
         internal static bool processStandoffFiredShot = true;
         internal static bool shouldDrop = true;
         internal static bool replaceCurrentAmmo = false;
@@ -21,9 +22,9 @@ namespace CustomGameModes
         (
             name: "Standoff",
             description: "• You can only shoot when signaled\n\n• Hit someone to give them a \"mark\"\n\n• Bullets left in your gun count as \"marks\"\n\n• Most marked players are eliminated",
-            gameModeType: GameModeType.Standoff,
-            vanillaGameModeType: GameModeType.HatKing,
-
+            gameModeType: GameModeData_GameModeType.Standoff,
+            vanillaGameModeType: GameModeData_GameModeType.HatKing,
+            
             shortModeTime: 45,
             mediumModeTime: 55,
             longModeTime: 60,
@@ -66,7 +67,7 @@ namespace CustomGameModes
                 if (LobbyManager.steamIdToUID.Count - Instance.ClientsWithGameMode.Count != 0)
                 {
                     List<byte> bytes = [];
-                    bytes.AddRange(BitConverter.GetBytes((int)ServerSendType.hatScores));
+                    bytes.AddRange(BitConverter.GetBytes((int)ServerPackets.hatScores));
                     bytes.AddRange(BitConverter.GetBytes(Standoff.standoffPlayers.Count));
 
                     foreach (ulong clientId in Standoff.standoffPlayers.Keys)
@@ -83,7 +84,7 @@ namespace CustomGameModes
 
                     foreach (ulong clientId in LobbyManager.steamIdToUID.Keys)
                         if (!Instance.ClientsWithGameMode.ContainsKey(clientId))
-                            SteamPacketManager.SendPacket(new(clientId), packet, 8, SteamPacketDestination.ToClient);
+                            SteamPacketManager.SendPacket(new CSteamID(clientId), packet, 8, SteamPacketManager_NetworkChannel.ToClient);
                 }
                 yield return new WaitForSeconds(5);
             }
@@ -91,9 +92,9 @@ namespace CustomGameModes
 
 
         // Begin syncing vanilla player penalties every 5 seconds
-        [HarmonyPatch(typeof(GameModeStandoff), nameof(GameModeStandoff.InitMode))]
+        [HarmonyPatch(typeof(Deobf_GameModeStandoff), nameof(Deobf_GameModeStandoff.InitMode))]
         [HarmonyPostfix]
-        internal static void PostInitMode(GameModeStandoff __instance)
+        internal static void PostInitMode(Deobf_GameModeStandoff __instance)
         {
             Standoff = __instance;
 
@@ -102,7 +103,7 @@ namespace CustomGameModes
         }
 
         // Overwrite FindPlayersToKill, making it a bit more fair how many players are killed
-        [HarmonyPatch(typeof(GameModeStandoff), nameof(GameModeStandoff.FindPlayersToKill))]
+        [HarmonyPatch(typeof(Deobf_GameModeStandoff), nameof(Deobf_GameModeStandoff.FindPlayersToKill))]
         [HarmonyPrefix]
         internal static bool PreFindPlayersToKill(ref int __result)
         {
@@ -111,9 +112,9 @@ namespace CustomGameModes
         }
 
         // Add and remove standoffPlayers as players join and leave (avoids errors at the end of the game when trying to kill players that left the game before dying)
-        [HarmonyPatch(typeof(GameModeStandoff), nameof(GameModeStandoff.OnPlayerSpawnOrDespawn))]
+        [HarmonyPatch(typeof(Deobf_GameModeStandoff), nameof(Deobf_GameModeStandoff.OnPlayerSpawnOrDespawn))]
         [HarmonyPostfix]
-        internal static void PostOnPlayerSpawnOrDespawn(GameModeStandoff __instance, ulong param_1)
+        internal static void PostOnPlayerSpawnOrDespawn(Deobf_GameModeStandoff __instance, ulong param_1)
         {
             if (GameManager.Instance.activePlayers.ContainsKey(param_1) && !__instance.standoffPlayers.ContainsKey(param_1) && !GameManager.Instance.activePlayers[param_1].dead)
                 __instance.standoffPlayers.Add(param_1, new(GameManager.Instance.activePlayers[param_1]));
@@ -122,9 +123,9 @@ namespace CustomGameModes
         }
 
         // Override OnFreezeOver and inform players that they should wait to shoot
-        [HarmonyPatch(typeof(GameModeStandoff), nameof(GameModeStandoff.OnFreezeOver))]
+        [HarmonyPatch(typeof(Deobf_GameModeStandoff), nameof(Deobf_GameModeStandoff.OnFreezeOver))]
         [HarmonyPrefix]
-        internal static bool PreOnFreezeOver(GameModeStandoff __instance)
+        internal static bool PreOnFreezeOver(Deobf_GameModeStandoff __instance)
         {
             __instance.field_Private_Int32_0 = __instance.FindPlayersToKill();
             foreach (ulong clientId in GameManager.Instance.activePlayers.Keys)
@@ -144,18 +145,18 @@ namespace CustomGameModes
         }
 
         // Inform players of toggle
-        [HarmonyPatch(typeof(GameModeStandoff), nameof(GameModeStandoff.ToggleShoot))]
+        [HarmonyPatch(typeof(Deobf_GameModeStandoff), nameof(Deobf_GameModeStandoff.ToggleShoot))]
         [HarmonyPostfix]
-        internal static void PostToggleShoot(GameModeStandoff __instance)
+        internal static void PostToggleShoot(Deobf_GameModeStandoff __instance)
         {
             if (SteamManager.Instance.IsLobbyOwner())
                 Utility.SendMessage($"You can {(__instance.canShoot ? "NOW" : "NO LONGER")} shoot!", Utility.MessageType.Styled, "Standoff");
         }
 
         // Overwrite ShotPlayer, prevent shots when player can't shoot, and inform player that they hit another player
-        [HarmonyPatch(typeof(GameModeStandoff), nameof(GameModeStandoff.ShotPlayer))]
+        [HarmonyPatch(typeof(Deobf_GameModeStandoff), nameof(Deobf_GameModeStandoff.ShotPlayer))]
         [HarmonyPrefix]
-        internal static bool PreShotPlayer(GameModeStandoff __instance, ulong param_1, ulong param_2)
+        internal static bool PreShotPlayer(Deobf_GameModeStandoff __instance, ulong param_1, ulong param_2)
         {
             if (!__instance.CanFire(param_1) || !Instance.CanShoot(param_1))
                 return false;
@@ -169,9 +170,9 @@ namespace CustomGameModes
         }
 
         // Override ShotFired, prevent shots from occuring when they couldn't haven, and inform the player of their remaining shots
-        [HarmonyPatch(typeof(GameModeStandoff), nameof(GameModeStandoff.ShotFired))]
+        [HarmonyPatch(typeof(Deobf_GameModeStandoff), nameof(Deobf_GameModeStandoff.ShotFired))]
         [HarmonyPrefix]
-        internal static bool PreShotFired(GameModeStandoff __instance, ulong param_1)
+        internal static bool PreShotFired(Deobf_GameModeStandoff __instance, ulong param_1)
         {
             if (!processStandoffFiredShot)
                 return false;
@@ -213,11 +214,11 @@ namespace CustomGameModes
         }
 
         // Updates ammo ui
-        [HarmonyPatch(typeof(GameModeStandoff), nameof(GameModeStandoff.StandoffUpdate))]
+        [HarmonyPatch(typeof(Deobf_GameModeStandoff), nameof(Deobf_GameModeStandoff.StandoffUpdate))]
         [HarmonyPostfix]
         internal static void PostStandoffUpdate(int param_1, ulong param_3)
         {
-            if (param_3 == Utility.ClientId && param_1 != -1)
+            if (param_3 == SteamManager.Instance.get_PlayerSteamId().m_SteamID && param_1 != -1)
                 PlayerInventory.Instance.UpdateAmmoUI();
         }
 
@@ -258,7 +259,7 @@ namespace CustomGameModes
         internal static bool PreServerSendStandoffToggle(bool param_0)
         {
             List<byte> bytes = [];
-            bytes.AddRange(BitConverter.GetBytes((int)ServerSendType.standoffToggle));
+            bytes.AddRange(BitConverter.GetBytes((int)ServerPackets.standoffToggle));
             bytes.AddRange(BitConverter.GetBytes(param_0));
             bytes.InsertRange(0, BitConverter.GetBytes(bytes.Count));
 
@@ -268,7 +269,7 @@ namespace CustomGameModes
                 packet.field_Private_List_1_Byte_0.Add(b);
 
             foreach (ulong clientId in Instance.ClientsWithGameMode.Keys)
-                SteamPacketManager.SendPacket(new(clientId), packet, 8, SteamPacketDestination.ToClient);
+                SteamPacketManager.SendPacket(new CSteamID(clientId), packet, 8, SteamPacketManager_NetworkChannel.ToClient);
 
             if (!param_0)
             {
@@ -287,7 +288,7 @@ namespace CustomGameModes
         internal static bool PreServerSendStandoffUpdate(int param_0, int param_1, ulong param_2, ulong param_3)
         {
             List<byte> bytes = [];
-            bytes.AddRange(BitConverter.GetBytes((int)ServerSendType.standoffUpdate));
+            bytes.AddRange(BitConverter.GetBytes((int)ServerPackets.standoffUpdate));
             bytes.AddRange(BitConverter.GetBytes(param_0));
             bytes.AddRange(BitConverter.GetBytes(param_1));
             bytes.AddRange(BitConverter.GetBytes(param_2));
@@ -300,11 +301,11 @@ namespace CustomGameModes
                 packet.field_Private_List_1_Byte_0.Add(b);
 
             foreach (ulong clientId in Instance.ClientsWithGameMode.Keys)
-                SteamPacketManager.SendPacket(new(clientId), packet, 8, SteamPacketDestination.ToClient);
+                SteamPacketManager.SendPacket(new CSteamID(clientId), packet, 8, SteamPacketManager_NetworkChannel.ToClient);
 
 
             bytes = [];
-            bytes.AddRange(BitConverter.GetBytes((int)ServerSendType.hatScores));
+            bytes.AddRange(BitConverter.GetBytes((int)ServerPackets.hatScores));
             bytes.AddRange(BitConverter.GetBytes(1));
 
             bytes.AddRange(BitConverter.GetBytes(param_2));
@@ -318,7 +319,7 @@ namespace CustomGameModes
 
             foreach (ulong clientId in LobbyManager.steamIdToUID.Keys)
                 if (!Instance.ClientsWithGameMode.ContainsKey(clientId))
-                    SteamPacketManager.SendPacket(new(clientId), packet, 8, SteamPacketDestination.ToClient);
+                    SteamPacketManager.SendPacket(new CSteamID(clientId), packet, 8, SteamPacketManager_NetworkChannel.ToClient);
             return false;
         }
 
@@ -327,12 +328,12 @@ namespace CustomGameModes
         [HarmonyPrefix]
         internal static void PrePlayerInventoryUpdateAmmoUI()
             => replaceCurrentAmmo = true;
-        [HarmonyPatch(typeof(GameUiStatusBottomRightAmmo), nameof(GameUiStatusBottomRightAmmo.SetRatio))]
+        [HarmonyPatch(typeof(CircleRatioUI), nameof(CircleRatioUI.SetRatio))]
         [HarmonyPrefix]
-        internal static void PreGameUiStatusBottomRightAmmoSetRatio(ref int param_1)
+        internal static void PreCircleRatioUISetRatio(ref int param_1)
         {
             if (replaceCurrentAmmo)
-                param_1 = Standoff.standoffPlayers[Utility.ClientId]?.field_Public_Int32_0 ?? 0;
+                param_1 = Standoff.standoffPlayers[SteamManager.Instance.get_PlayerSteamId().m_SteamID]?.field_Public_Int32_0 ?? 0;
         }
         [HarmonyPatch(typeof(PlayerInventory), nameof(PlayerInventory.UpdateAmmoUI))]
         [HarmonyPostfix]

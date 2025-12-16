@@ -1,4 +1,6 @@
 ﻿using BepInEx.IL2CPP.Utils;
+using CrabDevKit.Intermediary;
+using CrabDevKit.Utilities;
 using HarmonyLib;
 using SteamworksNative;
 using System;
@@ -34,9 +36,9 @@ namespace CustomGameModes
 
 
         //   Makes game modes scale dynamically on the lobby creation screen
-        [HarmonyPatch(typeof(MenuUiCreateLobbyGameModesAndMaps), nameof(MenuUiCreateLobbyGameModesAndMaps.Start))]
+        [HarmonyPatch(typeof(Deobf_MenuUiCreateLobbyGameModesAndMaps), nameof(Deobf_MenuUiCreateLobbyGameModesAndMaps.Start))]
         [HarmonyPostfix]
-        internal static void PostMenuUiCreateLobbyGameModesAndMapsStart(MenuUiCreateLobbyGameModesAndMaps __instance)
+        internal static void PostDeobf_MenuUiCreateLobbyGameModesAndMapsStart(Deobf_MenuUiCreateLobbyGameModesAndMaps __instance)
         {
             GridLayoutGroup gameModeGroup = __instance.modeContainer.GetComponent<GridLayoutGroup>();
 
@@ -49,9 +51,9 @@ namespace CustomGameModes
         //   Override MenuUiServerListingGameModesAndMapsInfo.SetModes, to only iterate over the vanilla game modes, then add the custom game modes, and scale the ui dynamically
         internal static float defaultGameModesAndMapsTextSpacing = 0;
         internal static float defaultMapsTextAndContainerSpacing = 0;
-        [HarmonyPatch(typeof(MenuUiServerListingGameModesAndMapsInfo), nameof(MenuUiServerListingGameModesAndMapsInfo.SetModes))]
+        [HarmonyPatch(typeof(Deobf_MenuUiServerListingGameModesAndMapsInfo), nameof(Deobf_MenuUiServerListingGameModesAndMapsInfo.SetModes))]
         [HarmonyPrefix]
-        internal static bool PreMenuUiServerListingGameModesAndMapsInfoSetModes(MenuUiServerListingGameModesAndMapsInfo __instance, string param_1)
+        internal static bool PreDeobf_MenuUiServerListingGameModesAndMapsInfoSetModes(Deobf_MenuUiServerListingGameModesAndMapsInfo __instance, string param_1)
         {
             int index = 0;
             for (int i = 0; i < Api.VanillaGameModesCount; i++)
@@ -104,7 +106,7 @@ namespace CustomGameModes
             return false;
         }
          
-
+        
         //   Override GameModeManager.GetAvailableModesString, return the vanilla game modes as normal, as well as the custom game modes in a custom format
         [HarmonyPatch(typeof(GameModeManager), nameof(GameModeManager.GetAvailableModesString))]
         [HarmonyPrefix]
@@ -166,7 +168,10 @@ namespace CustomGameModes
             {
                 Instance.preloadingMapId = Api.customGameModes[GameModeManager.Instance.allGameModes[param_1].modeName].PreloadMapId;
                 if (Instance.preloadingMapId != -1)
+                {
                     Instance.preloadingState = PreloadingState.InProgress;
+                    Instance.postloadingMapId = param_0;
+                }
             }
 
             foreach (ulong clientId in LobbyManager.steamIdToUID.Keys)
@@ -182,7 +187,7 @@ namespace CustomGameModes
                 return;
 
             CustomGameMode customGameMode = Api.customGameModes[GameModeManager.Instance.allGameModes[param_1].modeName];
-            if (param_2 != Utility.HostClientId)
+            if (param_2 != SteamManager.Instance.get_lobbyOwnerSteamId().m_SteamID)
             {
                 param_1 = customGameMode.ClientsWithGameMode.ContainsKey(param_2)
                     ? customGameMode.ClientsWithGameMode[param_2]
@@ -248,15 +253,17 @@ namespace CustomGameModes
                 return;
 
             Instance.shouldSendHostCustomGameModes = false;
-            List<byte> bytes = [.. BitConverter.GetBytes(Api.customGameModes.Count)];
+            Packet packet = new();
+            packet.Write(Api.customGameModes.Count);
             foreach (CustomGameMode customGameMode in Api.customGameModes.Values)
-                bytes.AddRange([
-                    .. BitConverter.GetBytes(customGameMode.Name.Length),
-                    .. Encoding.ASCII.GetBytes(customGameMode.Name),
-                    .. BitConverter.GetBytes(customGameMode.GameModeId)
-                ]);
-
-            CrabNetLib.SendMessageToServer(nameof(CustomGameModes.ClientCustomGameModes), bytes);
+            {
+                packet.Write(customGameMode.Name);
+                packet.Write(customGameMode.Version);
+                packet.Write(customGameMode.GameModeId);
+            }
+            
+            CrabNet.SendMessage(CLIENT_CUSTOM_GAME_MODES, packet, SteamManager.Instance.get_lobbyOwnerSteamId().m_SteamID);
+            packet.Dispose();
         }
 
 
@@ -267,14 +274,16 @@ namespace CustomGameModes
         internal static void PostLobbyManagerStartLobby()
         {
             Instance.clientCustomGameModes.Clear();
-            Instance.clientCustomGameModes[Utility.ClientId] = [];
+            Instance.clientCustomGameModes[SteamManager.Instance.get_PlayerSteamId().m_SteamID] = [];
             foreach (CustomGameMode customGameMode in Api.customGameModes.Values)
             {
-                Instance.clientCustomGameModes[Utility.ClientId][customGameMode.Name] = customGameMode.GameModeId;
+                Instance.clientCustomGameModes[SteamManager.Instance.get_PlayerSteamId().m_SteamID][customGameMode.Name] = customGameMode.GameModeId;
                 customGameMode.ClientsWithGameMode.Clear();
-                customGameMode.ClientsWithGameMode[Utility.ClientId] = customGameMode.GameModeId;
+                customGameMode.ClientGameModeVersions.Clear();
+                customGameMode.ClientsWithGameMode[SteamManager.Instance.get_PlayerSteamId().m_SteamID] = customGameMode.GameModeId;
+                customGameMode.ClientGameModeVersions[SteamManager.Instance.get_PlayerSteamId().m_SteamID] = customGameMode.Version;
             }
-
+            
             Instance.preloadingState = PreloadingState.None;
             Instance.preloadingMapId = -1;
             Instance.clientIdsPreloading.Clear();
@@ -290,8 +299,11 @@ namespace CustomGameModes
 
             Instance.clientCustomGameModes.Remove(param_1.m_SteamID);
             foreach (CustomGameMode customGameMode in Api.customGameModes.Values)
+            {
                 customGameMode.ClientsWithGameMode.Remove(param_1.m_SteamID);
-
+                customGameMode.ClientGameModeVersions.Remove(param_1.m_SteamID);
+            }
+            
             if (Instance.preloadingState == PreloadingState.InProgress)
             {
                 Instance.clientIdsPreloading.Remove(param_1.m_SteamID);
@@ -304,46 +316,14 @@ namespace CustomGameModes
         {
             Instance.clientCustomGameModes.Clear();
             foreach (CustomGameMode customGameMode in Api.customGameModes.Values)
+            {
                 customGameMode.ClientsWithGameMode.Clear();
+                customGameMode.ClientGameModeVersions.Clear();
+            }
 
             Instance.preloadingState = PreloadingState.None;
             Instance.preloadingMapId = -1;
             Instance.clientIdsPreloading.Clear();
-        }
-
-
-
-        //   CrabNetLib
-        // Client Message Handler
-        [HarmonyPatch(typeof(ClientHandle), nameof(ClientHandle.LobbyMapUpdate))]
-        [HarmonyPostfix]
-        internal static void PostClientHandleLobbyMapUpdate(Packet param_0)
-        {
-            if (param_0.field_Private_ArrayOf_Byte_0.Length <= 12)
-                return;
-
-            byte[] bytes = [.. param_0.field_Private_ArrayOf_Byte_0];
-            int messageLength = BitConverter.ToInt32(bytes, 8);
-            string message = Encoding.ASCII.GetString(bytes, 12, messageLength);
-
-            if (CrabNetLib.clientMessageHandlers.ContainsKey(message))
-                CrabNetLib.clientMessageHandlers[message](bytes[(12 + messageLength)..]);
-        }
-        
-        // Server Message Handler
-        [HarmonyPatch(typeof(ServerHandle), nameof(ServerHandle.HandShake))]
-        [HarmonyPostfix]
-        internal static void PostServerHandleHandShake(ulong param_0, Packet param_1)
-        {
-            if (param_1.field_Private_ArrayOf_Byte_0.Length <= 12)
-                return;
-
-            byte[] bytes = param_1.field_Private_ArrayOf_Byte_0;
-            int messageLength = BitConverter.ToInt32(bytes, 8);
-            string message = Encoding.ASCII.GetString(bytes, 12, messageLength);
-
-            if (CrabNetLib.serverMessageHandlers.ContainsKey(message))
-                CrabNetLib.serverMessageHandlers[message](param_0, bytes[(12 + messageLength)..]);
         }
 
 

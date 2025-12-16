@@ -22,15 +22,15 @@ namespace CustomGameModes
                 customGameModes.ContainsKey(customGameMode.Name) ||
                 customGameModes.ContainsValue(customGameMode) ||
 
-                !Enum.IsDefined(typeof(GameModeType), customGameMode.GameModeType) ||
-                customGameMode.GameModeType == GameModeType.Waiting ||
-                customGameMode.GameModeType == GameModeType.Practice ||
+                !Enum.IsDefined(typeof(GameModeData_GameModeType), customGameMode.GameModeType) ||
+                customGameMode.GameModeType == GameModeData_GameModeType.Waiting ||
+                customGameMode.GameModeType == GameModeData_GameModeType.Practice ||
 
-                !Enum.IsDefined(typeof(GameModeType), customGameMode.VanillaGameModeType) ||
-                customGameMode.VanillaGameModeType == GameModeType.Waiting ||
-                customGameMode.VanillaGameModeType == GameModeType.Practice ||
-                customGameMode.VanillaGameModeType == GameModeType.Baseball ||
-                customGameMode.VanillaGameModeType == GameModeType.Standoff
+                !Enum.IsDefined(typeof(GameModeData_GameModeType), customGameMode.VanillaGameModeType) ||
+                customGameMode.VanillaGameModeType == GameModeData_GameModeType.Waiting ||
+                customGameMode.VanillaGameModeType == GameModeData_GameModeType.Practice ||
+                customGameMode.VanillaGameModeType == GameModeData_GameModeType.Baseball ||
+                customGameMode.VanillaGameModeType == GameModeData_GameModeType.Standoff
             )
                 return false;
 
@@ -151,12 +151,12 @@ namespace CustomGameModes
     (
         string name,
         string description,
-        GameModeType gameModeType,
-        GameModeType vanillaGameModeType,
+        GameModeData_GameModeType gameModeType,
+        GameModeData_GameModeType vanillaGameModeType,
         string preloadMapName = null,
 
         bool isSmallMode = true,
-        SongType musicType = SongType.Intense,
+        MusicController_SongType musicType = MusicController_SongType.Intense,
         bool waitForRoundOverToDeclareSoloWinner = false,
 
         int minPlayers = 0,
@@ -175,15 +175,16 @@ namespace CustomGameModes
     {
         public string Name { get; internal set; } = name;
         public string Description { get; internal set; } = description;
-        public GameModeType GameModeType { get; internal set; } = gameModeType;               // The game mode to be used when using the mod adding this custom game mode
-        public GameModeType VanillaGameModeType { get; internal set; } = vanillaGameModeType; // The game mode to be used when NOT using the mod adding this custom game mode
+        public GameModeData_GameModeType GameModeType { get; internal set; } = gameModeType;               // The game mode to be used when using the mod adding this custom game mode
+        public GameModeData_GameModeType VanillaGameModeType { get; internal set; } = vanillaGameModeType; // The game mode to be used when NOT using the mod adding this custom game mode
         public string PreloadMapName { get; internal set; } = preloadMapName;                 // The name of the map to load before loading into the proper map. Don't use this unless you specifically need it, such as to access teams from Tile Drive maps
+        public string Version { get; protected set; } = "0.0.0"; 
         public int GameModeId { get; internal set; } = -1;
         public int VanillaGameModeId { get; internal set; } = -1;
         public int PreloadMapId { get; internal set; } = -1;
         
         public bool IsSmallMode { get; internal set; } = isSmallMode; // Is playable with just 2 players
-        public SongType MusicType { get; internal set; } = musicType; // The type of music to play
+        public MusicController_SongType MusicType { get; internal set; } = musicType; // The type of music to play
         public bool WaitForRoundOverToDeclareSoloWinner { get; internal set; } = waitForRoundOverToDeclareSoloWinner; // Should the game wait for the round timer to finish at 1 player remaining (true) or should it end automatically if only one player is left alive (false)?
 
         public int MinPlayers { get; internal set; } = minPlayers; // The minimum number of players required to play this game mode
@@ -200,7 +201,8 @@ namespace CustomGameModes
         public int LargeMapPlayers { get; internal set; }          = largeMapPlayers;            // Players >= largeMapPlayers
 
         public Dictionary<ulong, int> ClientsWithGameMode { get; internal set; } = [];
-
+        public Dictionary<ulong, string> ClientGameModeVersions { get; internal set; } = [];
+        
         public virtual void PreInit() { }
         public virtual void PostEnd() { }
     }

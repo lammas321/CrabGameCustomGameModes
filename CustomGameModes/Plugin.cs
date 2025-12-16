@@ -1,5 +1,7 @@
 using BepInEx;
 using BepInEx.IL2CPP;
+using CrabDevKit.Intermediary;
+using CrabDevKit.Utilities;
 using HarmonyLib;
 using System;
 using System.Collections.Generic;
@@ -9,6 +11,7 @@ using System.Text;
 namespace CustomGameModes
 {
     [BepInPlugin($"lammas123.{MyPluginInfo.PLUGIN_NAME}", MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
+    [BepInDependency("lammas123.CrabDevKit")]
     public class CustomGameModes : BasePlugin
     {
         internal static CustomGameModes Instance;
@@ -19,8 +22,11 @@ namespace CustomGameModes
 
         internal PreloadingState preloadingState = PreloadingState.None;
         internal int preloadingMapId = -1;
+        internal int postloadingMapId = -1;
         internal HashSet<ulong> clientIdsPreloading = [];
 
+        internal const string CLIENT_CUSTOM_GAME_MODES = $"lammas123.{MyPluginInfo.PLUGIN_NAME}:CustomGameModes";
+        
         public override void Load()
         {
             CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
@@ -33,7 +39,7 @@ namespace CustomGameModes
             Api.RegisterCustomGameMode(new CustomGameModeBaseball());
             Api.RegisterCustomGameMode(new CustomGameModeStandoff());
 
-            CrabNetLib.RegisterServerMessageHandler(nameof(ClientCustomGameModes), ClientCustomGameModes);
+            CrabNet.RegisterMessageHandler(CLIENT_CUSTOM_GAME_MODES, ClientCustomGameModes);
 
             Harmony.CreateAndPatchAll(typeof(Patches));
             Log.LogInfo($"Loaded [{MyPluginInfo.PLUGIN_NAME} {MyPluginInfo.PLUGIN_VERSION}]");
@@ -65,28 +71,32 @@ namespace CustomGameModes
             clientIdsPreloading.Clear();
 
             foreach (ulong clientId in LobbyManager.steamIdToUID.Keys)
-                ServerSend.LoadMap(preloadingMapId, LobbyManager.Instance.gameMode.id, clientId);
+                ServerSend.LoadMap(postloadingMapId, LobbyManager.Instance.gameMode.id, clientId);
             preloadingMapId = -1;
+            postloadingMapId = -1;
         }
 
-        internal void ClientCustomGameModes(ulong clientId, byte[] bytes)
+        internal void ClientCustomGameModes(ulong clientId, Packet packet)
         {
-            int index = 0;
-            int count = BitConverter.ToInt32(bytes, index);
-            index += 4;
+            if (!SteamManager.Instance.IsLobbyOwner())
+                return;
 
+            int gameModes = packet.ReadInt();
             Dictionary<string, int> customGameModes = [];
-            for (int i = 0; i < count; i++)
-            {
-                int customGameModeNameLength = BitConverter.ToInt32(bytes, index);
-                index += 4;
-                string customGameModeName = Encoding.ASCII.GetString(bytes, index, customGameModeNameLength);
-                index += customGameModeNameLength;
-                customGameModes[customGameModeName] = BitConverter.ToInt32(bytes, index);
-                index += 4;
 
-                if (Api.customGameModes.ContainsKey(customGameModeName))
-                    Api.customGameModes[customGameModeName].ClientsWithGameMode[clientId] = customGameModes[customGameModeName];
+            for (int i = 0; i < gameModes; i++)
+            {
+                string gameModeName = packet.ReadString();
+                string gameModeVersion = packet.ReadString();
+                int gameModeId = packet.ReadInt();
+
+                customGameModes[gameModeName] = gameModeId;
+
+                if (Api.customGameModes.ContainsKey(gameModeName))
+                {
+                    Api.customGameModes[gameModeName].ClientsWithGameMode[clientId] = gameModeId;
+                    Api.customGameModes[gameModeName].ClientGameModeVersions[clientId] = gameModeVersion;
+                }
             }
 
             clientCustomGameModes[clientId] = customGameModes;

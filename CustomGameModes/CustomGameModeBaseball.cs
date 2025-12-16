@@ -4,8 +4,8 @@
     (
         name: "Baseball",
         description: "• Baseball without balls, players must try to get other players out of bounds to eliminate them.",
-        gameModeType: GameModeType.Baseball,
-        vanillaGameModeType: GameModeType.FallingPlatforms,
+        gameModeType: GameModeData_GameModeType.Baseball,
+        vanillaGameModeType: GameModeData_GameModeType.FallingPlatforms,
 
         shortModeTime: 60,
         mediumModeTime: 75,
