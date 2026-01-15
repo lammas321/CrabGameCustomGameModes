@@ -10,7 +10,7 @@ using System.Text;
 
 namespace CustomGameModes
 {
-    [BepInPlugin($"lammas123.{MyPluginInfo.PLUGIN_NAME}", MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
+    [BepInPlugin(MyPluginInfo.PLUGIN_GUID, MyPluginInfo.PLUGIN_NAME, MyPluginInfo.PLUGIN_VERSION)]
     [BepInDependency("lammas123.CrabDevKit")]
     public class CustomGameModes : BasePlugin
     {
@@ -25,7 +25,7 @@ namespace CustomGameModes
         internal int postloadingMapId = -1;
         internal HashSet<ulong> clientIdsPreloading = [];
 
-        internal const string CLIENT_CUSTOM_GAME_MODES = $"lammas123.{MyPluginInfo.PLUGIN_NAME}:CustomGameModes";
+        internal const string CLIENT_CUSTOM_GAME_MODES = $"{MyPluginInfo.PLUGIN_GUID}:CustomGameModes";
         
         public override void Load()
         {
@@ -42,7 +42,7 @@ namespace CustomGameModes
             CrabNet.RegisterMessageHandler(CLIENT_CUSTOM_GAME_MODES, ClientCustomGameModes);
 
             Harmony.CreateAndPatchAll(typeof(Patches));
-            Log.LogInfo($"Loaded [{MyPluginInfo.PLUGIN_NAME} {MyPluginInfo.PLUGIN_VERSION}]");
+            Log.LogInfo($"Initialized [{MyPluginInfo.PLUGIN_NAME} {MyPluginInfo.PLUGIN_VERSION}]");
         }
 
         internal void CheckPreloadingFinished()
