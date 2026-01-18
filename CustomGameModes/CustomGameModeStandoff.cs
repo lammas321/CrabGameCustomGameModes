@@ -1,5 +1,6 @@
 ﻿using BepInEx.IL2CPP.Utils;
 using CrabDevKit.Intermediary;
+using CrabDevKit.Utilities;
 using HarmonyLib;
 using SteamworksNative;
 using System;
@@ -140,7 +141,7 @@ namespace CustomGameModes
             shouldDrop = true;
             __instance.Invoke("SendToggle", __instance.activeTime);
 
-            Utility.SendMessage("Hold your fire until the next notice! You have 6 shots.", Utility.MessageType.Styled, "Standoff");
+            ChatUtil.SendMessage("Hold your fire until the next notice! You have 6 shots.", ChatUtil.MessageType.Styled, "Standoff");
             return false;
         }
 
@@ -150,7 +151,7 @@ namespace CustomGameModes
         internal static void PostToggleShoot(Deobf_GameModeStandoff __instance)
         {
             if (SteamManager.Instance.IsLobbyOwner())
-                Utility.SendMessage($"You can {(__instance.canShoot ? "NOW" : "NO LONGER")} shoot!", Utility.MessageType.Styled, "Standoff");
+                ChatUtil.SendMessage($"You can {(__instance.canShoot ? "NOW" : "NO LONGER")} shoot!", ChatUtil.MessageType.Styled, "Standoff");
         }
 
         // Overwrite ShotPlayer, prevent shots when player can't shoot, and inform player that they hit another player
@@ -165,7 +166,7 @@ namespace CustomGameModes
             __instance.standoffPlayers[param_1].field_Public_Int32_1--;
             ServerSend.StandoffUpdate(-1, __instance.standoffPlayers[param_2].field_Public_Int32_1, param_2, param_1);
 
-            Utility.SendMessage(param_1, $"Hit {SteamFriends.GetFriendPersonaName(new(param_2))}!", Utility.MessageType.Styled, "Standoff");
+            ChatUtil.SendMessage(param_1, $"Hit {SteamFriends.GetFriendPersonaName(new(param_2))}!", ChatUtil.MessageType.Styled, "Standoff");
             return false;
         }
 
@@ -178,7 +179,7 @@ namespace CustomGameModes
                 return false;
             if (!Instance.CanShoot(param_1))
             {
-                Utility.SendMessage(param_1, "Shots do not count at this time.", Utility.MessageType.Styled, "Standoff");
+                ChatUtil.SendMessage(param_1, "Shots do not count at this time.", ChatUtil.MessageType.Styled, "Standoff");
                 shouldDrop = false;
                 GameServer.ForceGiveWeapon(param_1, 2, SharedObjectManager.Instance.GetNextId());
                 shouldDrop = true;
@@ -189,11 +190,11 @@ namespace CustomGameModes
             __instance.standoffPlayers[param_1].field_Public_Int32_0--;
             __instance.standoffPlayers[param_1].field_Public_Int32_1++;
             ServerSend.StandoffUpdate(__instance.standoffPlayers[param_1].field_Public_Int32_0, __instance.standoffPlayers[param_1].field_Public_Int32_1, param_1, 0UL);
-            Utility.SendMessage(param_1, $"Remaining shots: {__instance.standoffPlayers[param_1].field_Public_Int32_0}/6", Utility.MessageType.Styled, "Standoff");
+            ChatUtil.SendMessage(param_1, $"Remaining shots: {__instance.standoffPlayers[param_1].field_Public_Int32_0}/6", ChatUtil.MessageType.Styled, "Standoff");
             if (!__instance.CanFire(param_1))
             {
                 GameServer.ForceRemoveItemItemId(param_1, 2);
-                Utility.SendMessage(param_1, "You've ran out of bullets, avoid getting shot by others!", Utility.MessageType.Styled, "Standoff");
+                ChatUtil.SendMessage(param_1, "You've ran out of bullets, avoid getting shot by others!", ChatUtil.MessageType.Styled, "Standoff");
             }
 
             // Nobody has any more bullets

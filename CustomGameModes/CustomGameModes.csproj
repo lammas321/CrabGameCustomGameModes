@@ -11,7 +11,7 @@
 	<PropertyGroup>
 		<AssemblyName>lammas123.CustomGameModes</AssemblyName>
 		<Product>CustomGameModes</Product>
-		<Version>1.2.0</Version>
+		<Version>1.2.2</Version>
 
 		<SteamDir Condition="'$(SteamDir)' == ''">S:\Steam</SteamDir>
 		<ProfileDir Condition="'$(ProfileDir)' == ''">S:\Steam\steamapps\common\Crab Game</ProfileDir>

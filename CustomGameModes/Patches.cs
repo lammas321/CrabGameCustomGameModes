@@ -1,15 +1,11 @@
-﻿using BepInEx.IL2CPP.Utils;
-using CrabDevKit.Intermediary;
+﻿using CrabDevKit.Intermediary;
 using CrabDevKit.Utilities;
 using HarmonyLib;
 using SteamworksNative;
 using System;
-using System.Collections;
 using System.Collections.Generic;
-using System.Text;
 using TMPro;
 using UnityEngine;
-using UnityEngine.Playables;
 using UnityEngine.UI;
 using static CustomGameModes.CustomGameModes;
 
@@ -17,16 +13,6 @@ namespace CustomGameModes
 {
     internal static class Patches
     {
-        //   Anti Bepinex detection (Thanks o7Moon: https://github.com/o7Moon/CrabGame.AntiAntiBepinex)
-        [HarmonyPatch(typeof(EffectManager), nameof(EffectManager.Method_Private_Void_GameObject_Boolean_Vector3_Quaternion_0))] // Ensures effectSeed is never set to 4200069 (if it is, modding has been detected)
-        [HarmonyPatch(typeof(LobbyManager), nameof(LobbyManager.Method_Private_Void_0))] // Ensures connectedToSteam stays false (true means modding has been detected)
-        //[HarmonyPatch(typeof(SnowSpeedModdingDetector), nameof(SnowSpeedModdingDetector.Method_Private_Void_0))] // Would ensure snowSpeed is never set to Vector3.zero (though it is immediately set back to Vector3.one due to an accident on Dani's part lol)
-        [HarmonyPrefix]
-        internal static bool PreBepinexDetection()
-            => false;
-
-
-
         //   Add the custom game modes to GameModeManager
         [HarmonyPatch(typeof(GameModeManager), nameof(GameModeManager.Awake))]
         [HarmonyPostfix]
@@ -233,9 +219,13 @@ namespace CustomGameModes
                 return;
 
             if (Instance.preloadingState == PreloadingState.InProgress)
-                Utility.SendMessage(param_1, "This map is being preloaded before the next game mode, please be patient.", Utility.MessageType.Styled, "Preloading");
+                ChatUtil.SendMessage(param_1, "This map is being preloaded before the next game mode, please be patient.", ChatUtil.MessageType.Styled, "Preloading");
             else
-                Utility.SendCustomGameModeNotice(LobbyManager.Instance.gameMode, param_1);
+            {
+                ChatUtil.SendMessage(param_1, $"The current mode is actually {LobbyManager.Instance.gameMode.modeName}!", ChatUtil.MessageType.Styled, "NOTICE");
+                foreach (string line in ChatUtil.FormatGameModeDescription(LobbyManager.Instance.gameMode.modeDescription))
+                    ChatUtil.SendMessage(param_1, line, ChatUtil.MessageType.Styled);
+            }
         }
 
 
@@ -325,23 +315,5 @@ namespace CustomGameModes
             Instance.preloadingMapId = -1;
             Instance.clientIdsPreloading.Clear();
         }
-
-
-        /*
-        //   Singleplayer testing
-        // Allow all games to be played with 1 player by making the game believe there are 2 players alive
-        [HarmonyPatch(typeof(GameManager), nameof(GameManager.GetPlayersAlive))]
-        [HarmonyPostfix]
-        internal static void PostGameManagerGetPlayersAliveSingleplayerTesting(ref int __result)
-        {
-            if (__result == 1 && LobbyManager.steamIdToUID.Count == 1)
-                __result = 2;
-        }
-        // Set requiredReadyPlayers to 1 to allow starting games in singleplayer
-        [HarmonyPatch(typeof(GameModeManager), nameof(GameModeManager.Awake))]
-        [HarmonyPostfix]
-        internal static void PostGameModeManagerAwakeSingleplayerTesting()
-            => StaticConstants.field_Public_Static_Int32_2 = 1;
-        */
     }
 }
